@@ -2,23 +2,17 @@ import hashlib
 
 import socket
 
-def switch_case(peer, case):
-
-    cases = {"LI": peer.login(), "LO": peer.logout()}
-
-    cases[str(case)]
-
-    return
+from pathlib import Path
 
 class Peer:
 
     def __init__(self):
-        self.ip_dir = '192.168.1.6'  # edit for presentation
+        self.ip_dir = '10.14.98.199'  # edit for presentation
         self.dir_port = 3000
         self.dir_addr = (self.ip_dir, self.dir_port)
 
-        self.my_ipv4 = '192.168.1.4'
-        self.my_ipv6 = 'fe80::ac89:c3f8:ea1a:ca4b'
+        self.my_ipv4 = '10.0.2.15'
+        #self.my_ipv6 = 'fe80::ac89:c3f8:ea1a:ca4b'
         self.pPort = 50001  # peer port for receaving connection from other peer
 
     # -------- fase di login e logout con la directory --------
@@ -85,43 +79,64 @@ class Peer:
 
         self.deconnection()
 
-    def aggiunta(self, contenuto, nome):
+    def aggiunta(self, file):
 
         print("\n--- AGGIUNTA ---\n")
 
-        f = open('test.txt', 'r')
-        contenuto = f.read()
-        Filename = f.name()
+        #verifico l'esistenza del file
 
-        FileHash = hashlib.md5()
-        FileHash.update(contenuto.encode())
-        FileHash.hexdigest()
-        print(FileHash.hexdigest(), "\n")
+        check_file = Path(file)
 
-        self.connection()
+        if (check_file.is_file()):
+        
+            self.f = open(file, 'rb')
+            self.contenuto = self.f.read()
+            self.filename = self.f.name
 
-        # formattazione ip
-        self.split_ip = self.my_ipv4.split(".")
-        ip1 = self.split_ip[0].zfill(3)
-        ip2 = self.split_ip[1].zfill(3)
-        ip3 = self.split_ip[2].zfill(3)
-        ip4 = self.split_ip[3].zfill(3)
+            FileHash = hashlib.md5()
+            FileHash.update(self.contenuto)
+            FileHash.hexdigest()
 
-        self.ipp2p = ip1 + '.' + ip2 + '.' + ip3 + '.' + ip4
+            if (len(self.filename)<32):
+                self.filename = self.filename.ljust(32, ' ')
 
-        # formattazione porta
-        self.pp2p_bf = self.s.getsockname()[1]  # porta peer bad formatted
-        self.pp2p = '%(#)03d' % {"#": int(self.pp2p_bf)}
+            self.connection()
 
-        data_add_file = "ADDF."+FileHash.hexdigest()+"."+Filename
+            # formattazione ip
+            self.split_ip = self.my_ipv4.split(".")
+            ip1 = self.split_ip[0].zfill(3)
+            ip2 = self.split_ip[1].zfill(3)
+            ip3 = self.split_ip[2].zfill(3)
+            ip4 = self.split_ip[3].zfill(3)
 
-        self.s.send(data_add_file.encode())
+            self.ipp2p = ip1 + '.' + ip2 + '.' + ip3 + '.' + ip4
 
-        print("Ip peer ---> " + str(self.ipp2p))
-        print("Port peer ---> " + str(self.pp2p))
-        print(data_add_file)
+            # formattazione porta
+            self.pp2p_bf = self.s.getsockname()[1]  # porta peer bad formatted
+            self.pp2p = '%(#)03d' % {"#": int(self.pp2p_bf)}
 
-        self.deconnection()
+            data_add_file = "ADDF"+FileHash.hexdigest()+self.filename
+
+            self.s.send(data_add_file.encode())
+
+            print("Ip peer ---> " + str(self.ipp2p))
+            print("Port peer ---> " + str(self.pp2p))
+            print(data_add_file)
+
+            self.ack_login = self.s.recv(7)  # 4B di AADD + 3B di copia del file
+
+            if (self.ack_login[:4].decode() == "AADD"):
+                self.sid = self.ack_login[0:7]
+                print(str(self.sid.decode()),"\n")
+            else:
+                print("Errore del pacchetto, stringa 'AADD' non trovata")
+                exit()
+
+            self.deconnection()
+
+        else:
+         print("Controllare l'esistenza del file o il percorso indicato in fase di input")
+
 
     def logout(self):
         print("\n--- LOGOUT ---\n")
@@ -140,9 +155,21 @@ class Peer:
 
         self.deconnection()
 
+
+
+#def switch_case(peer, case):
+
+#    cases = {"LI": peer.login(), "LO": peer.logout()}
+
+#    cases[str(case)]
+
+#    return 
+
 # --- MAIN ---
 
 if __name__ == "__main__":
     peer = Peer()
-    case = input("LI,LO,ADD")
-    switch_case(peer, case)
+    file = input("Nome file da inviare\n")
+    peer.aggiunta(file)
+    #case = input("LI,LO,ADD\n")
+    #switch_case(peer, case)
